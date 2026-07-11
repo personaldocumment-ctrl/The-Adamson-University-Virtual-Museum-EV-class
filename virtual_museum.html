@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Wayfarer's Museum — 360° Virtual Gallery</title>
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    background: #0b0906;
+    overflow: hidden;
+  }
+
+  /* ---------- Intro / Door overlay ---------- */
+  #intro {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, #2a1f14 0%, #0b0906 75%);
+    z-index: 999;
+    color: #e8dcc4;
+    text-align: center;
+    transition: opacity 1.1s ease;
+  }
+  #intro h1 {
+    font-size: clamp(28px, 5vw, 52px);
+    letter-spacing: 3px;
+    margin-bottom: 6px;
+    color: #d8b96a;
+    text-shadow: 0 0 25px rgba(216,185,106,0.4);
+  }
+  #intro p {
+    max-width: 520px;
+    margin: 10px 20px 30px;
+    line-height: 1.6;
+    color: #c9bfa8;
+    font-size: 15px;
+  }
+  #enterBtn {
+    padding: 14px 42px;
+    font-size: 17px;
+    letter-spacing: 2px;
+    background: transparent;
+    border: 1px solid #d8b96a;
+    color: #d8b96a;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .3s ease;
+  }
+  #enterBtn:hover { background: #d8b96a; color: #0b0906; }
+
+  #hint {
+    position: fixed;
+    bottom: 18px; left: 50%;
+    transform: translateX(-50%);
+    color: #d8c9a3;
+    font-size: 13px;
+    background: rgba(0,0,0,0.45);
+    padding: 8px 18px;
+    border-radius: 20px;
+    z-index: 50;
+    opacity: 0;
+    transition: opacity 1s ease;
+    pointer-events: none;
+    letter-spacing: .5px;
+  }
+
+  #caption {
+    position: fixed;
+    top: 18px; left: 50%;
+    transform: translateX(-50%);
+    color: #f1e6c8;
+    background: rgba(20,14,8,0.55);
+    border: 1px solid rgba(216,185,106,0.4);
+    padding: 8px 20px;
+    font-size: 14px;
+    letter-spacing: .5px;
+    border-radius: 3px;
+    z-index: 50;
+    opacity: 0;
+    transition: opacity .4s ease;
+    pointer-events: none;
+  }
+
+  a-scene { width: 100vw; height: 100vh; }
+
+  /* ---------- Zoom modal ---------- */
+  #modalOverlay {
+    position: fixed; inset: 0;
+    background: rgba(8,6,3,0.88);
+    z-index: 900;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  #modalOverlay.show { display: flex; }
+  #modalCard {
+    max-width: 90vw;
+    width: 720px;
+    background: #1a140d;
+    border: 1px solid rgba(216,185,106,0.5);
+    border-radius: 6px;
+    padding: 22px 26px 26px;
+    color: #ecdfc2;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    text-align: center;
+  }
+  #modalImg {
+    width: 100%;
+    max-height: 55vh;
+    object-fit: contain;
+    border: 6px solid #d8b96a;
+    border-radius: 2px;
+    background: #000;
+  }
+  #modalTitle {
+    font-size: 22px;
+    color: #d8b96a;
+    letter-spacing: 1px;
+    margin: 16px 0 8px;
+  }
+  #modalDesc {
+    font-size: 15px;
+    line-height: 1.6;
+    color: #d8cbaa;
+    max-width: 620px;
+    margin: 0 auto;
+  }
+  #modalClose {
+    position: absolute;
+    top: 10px; right: 14px;
+    background: none;
+    border: none;
+    color: #d8b96a;
+    font-size: 26px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .modalNavRow {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+  }
+  .navBtn {
+    padding: 10px 22px;
+    background: transparent;
+    border: 1px solid #d8b96a;
+    color: #d8b96a;
+    font-family: inherit;
+    font-size: 14px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all .25s ease;
+  }
+  .navBtn:hover { background: #d8b96a; color: #1a140d; }
+  .navBtn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .navBtn:disabled:hover { background: transparent; color: #d8b96a; }
+
+  /* ---------- Finish tour button ---------- */
+  #finishTourBtn {
+    position: fixed;
+    top: 18px; right: 18px;
+    z-index: 60;
+    padding: 10px 20px;
+    background: rgba(20,14,8,0.6);
+    border: 1px solid #d8b96a;
+    color: #d8b96a;
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .6s ease, background .25s ease;
+  }
+  #finishTourBtn.visible { opacity: 1; pointer-events: auto; }
+  #finishTourBtn:hover { background: #d8b96a; color: #1a140d; }
+
+  /* ---------- Thank-you overlay ---------- */
+  #thankYou {
+    position: fixed; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, #2a1f14 0%, #0b0906 75%);
+    z-index: 999;
+    color: #e8dcc4;
+    text-align: center;
+  }
+  #thankYou.show { display: flex; flex-direction: column; align-items: center; }
+  #thankYou h2 {
+    font-size: clamp(24px, 4.5vw, 44px);
+    letter-spacing: 2px;
+    color: #d8b96a;
+    text-shadow: 0 0 25px rgba(216,185,106,0.4);
+    margin-bottom: 10px;
+  }
+  #thankYou p {
+    color: #c9bfa8;
+    font-size: 15px;
+    max-width: 460px;
+    line-height: 1.6;
+  }
+
+  /* ---------- On-screen movement controls (forward/backward/left/right) ---------- */
+  #moveControls {
+    position: fixed;
+    bottom: 26px; left: 22px;
+    z-index: 70;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .6s ease;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #moveControls.visible { opacity: 0.95; pointer-events: auto; }
+  #moveControls .moveRow { display: flex; gap: 6px; }
+  #moveControls .moveSpacer { width: 52px; height: 52px; flex: none; }
+  .moveBtn {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: rgba(26,20,13,0.7);
+    border: 1px solid #d8b96a;
+    color: #d8b96a;
+    font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    touch-action: none;
+    transition: background .15s ease, transform .1s ease;
+  }
+  .moveBtn:active,
+  .moveBtn.pressed {
+    background: #d8b96a;
+    color: #1a140d;
+    transform: scale(0.92);
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ ENTRANCE OVERLAY ============ -->
+<div id="intro">
+  <h1>THE ADAMSON VIRTUAL MUSEUM</h1>
+  <p>A 360° walkthrough MUSEUM. Ten keystones species of live animals,
+     there are sperated by the habitats that they belong too.
+     Step through the door to begin — use your mouse (or finger) to look around,
+     and W A S D or the on-screen joystick to walk.</p>
+  <button id="enterBtn">CLICK HERE TO OPEN THE DOOR</button>
+</div>
+
+<div id="hint">🖱️ Drag to look around &nbsp;•&nbsp; W A S D / arrow keys / on-screen buttons to move &nbsp;•&nbsp; Click a picture to zoom in</div>
+<div id="caption"></div>
+
+<!-- ============ FINISH TOUR BUTTON ============ -->
+<button id="finishTourBtn">🏁 FINISH TOUR</button>
+
+<!-- ============ MOVEMENT CONTROLS (forward / backward / left / right) ============ -->
+<div id="moveControls">
+  <div class="moveRow">
+    <span class="moveSpacer"></span>
+    <button id="btnForward" class="moveBtn" title="Move forward">▲</button>
+    <span class="moveSpacer"></span>
+  </div>
+  <div class="moveRow">
+    <button id="btnLeft" class="moveBtn" title="Move left">◀</button>
+    <span class="moveSpacer"></span>
+    <button id="btnRight" class="moveBtn" title="Move right">▶</button>
+  </div>
+  <div class="moveRow">
+    <span class="moveSpacer"></span>
+    <button id="btnBack" class="moveBtn" title="Move backward">▼</button>
+    <span class="moveSpacer"></span>
+  </div>
+</div>
+
+<!-- ============ ZOOM MODAL ============ -->
+<div id="modalOverlay">
+  <div id="modalCard">
+    <button id="modalClose">&times;</button>
+    <img id="modalImg" src="" alt="Zoomed picture">
+    <div id="modalTitle"></div>
+    <div id="modalDesc"></div>
+    <div class="modalNavRow">
+      <button class="navBtn" id="prevBtn">‹ Previous</button>
+      <button class="navBtn" id="nextBtn">Next ›</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ THANK YOU OVERLAY ============ -->
+<div id="thankYou">
+  <h2>Thank you for using our Adamson Virtual Museum</h2>
+  <p>We hope you enjoyed walking through the Hall of Living Species.
+     Come back anytime to explore again.</p>
+</div>
+
+<!-- ============ 3D MUSEUM SCENE ============ -->
+<a-scene cursor="rayOrigin: mouse" fog="type: exponential; color: #0e0a06; density: 0.045">
+
+  <a-assets>
+    <!-- Marine Habitats picture placeholders (replace src with your own images) -->
+    <img id="hist1" crossorigin="anonymous" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQevYBiJbrCkebTnNOnX-XhVY7xEvKChhEpiuPf3-5kP5EytM8-iIAtUEil&s=10">
+    <img id="hist2" crossorigin="anonymous" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRg7QjIUX91GXKyJtsz8L9ZwdOJ39OcJN61qVHt1Fh2jfEVED3tJ9d7wIHa&s=10">
+    <img id="hist3" crossorigin="anonymous" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTND9VUPBpHRW8V_TSFZ0jpC1eYhTNm5OdRkLI0bYJvfN_8C1LupDS1_jA&s=10">
+    <img id="hist4" crossorigin="anonymous" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSv95GMF0Ota6FwRD5bK3bo067oCEvui3WupFmG23A6WodN3h9p21nw-DU&s=10">
+    <img id="hist5" crossorigin="anonymous" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTo3K9ALK6pvV_qzjncs3Gxd8I6Cewb_FIkCrEiQn8do2lRhc83vZYc153N&s=10">
+
+
+    <!-- Mangrove & Forest Habitats / Freshwater & Wetland Habitats picture placeholders (replace src with your own images) -->
+    <img id="sp1" crossorigin="anonymous" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQhbFc0-KYsv-sLLCJ2VD6C80UdDGCXihrOdaEPs08y8Ben8V4xsYJcUTyx&s=10">
+    <img id="sp2" crossorigin="anonymous" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRn3WWBiYno6uktnTHE19S_Rg8PjpR_nv6z-0f3wEYfUYTfPoN9WS1U7xY&s=10">
+    <img id="sp3" crossorigin="anonymous" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT-R2w4oWNF2Xve94ly3XoGBDTW0jYcpG0AgpGx8zy2mWc1XkZCmkT-wVE&s=10">
+    <img id="sp4" crossorigin="anonymous" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQPbE2Ba1AM7DI-fe9s_aZXqroSSDRW78A6wiNccoOYbg0heE8TKpwiYbA&s=10">
+    <img id="sp5" crossorigin="anonymous" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRXG91SDQ6JT9teHgcchdX-oSQbcPgItxMa_PRWeMMQkdkNIEbQ-OJaWvo&s=10">
+
+    <img id="woodFloor" src="https://cdn.aframe.io/a-painter/images/floor.jpg">
+    <img id="doorTex" src="https://cdn.aframe.io/examples/ui/panels/wood.jpg">
+  </a-assets>
+
+  <!-- Lighting -->
+  <a-light type="ambient" color="#3a2f22" intensity="0.55"></a-light>
+  <a-light type="point" position="0 4 0" color="#ffdca8" intensity="0.9" distance="30"></a-light>
+  <a-light type="point" position="0 4 -14" color="#ffdca8" intensity="0.8" distance="25"></a-light>
+  <a-light type="point" position="0 4 -28" color="#ffdca8" intensity="0.8" distance="25"></a-light>
+
+  <!-- Floor -->
+  <a-plane rotation="-90 0 0" width="14" height="40" position="0 0 -18"
+           color="#4b3a28" material="roughness:0.9; metalness:0"></a-plane>
+
+  <!-- Ceiling -->
+  <a-plane rotation="90 0 0" width="14" height="40" position="0 4.2 -18" color="#171310"></a-plane>
+
+  <!-- Outer side walls -->
+  <a-plane rotation="0 90 0" width="40" height="4.2" position="-7 2.1 -18" color="#2b2419"></a-plane>
+  <a-plane rotation="0 -90 0" width="40" height="4.2" position="7 2.1 -18" color="#2b2419"></a-plane>
+  <a-plane rotation="0 180 0" width="14" height="4.2" position="0 2.1 -38" color="#241f18"></a-plane>
+
+  <!-- ============ ENTRANCE DOOR (front wall) ============ -->
+  <a-entity id="frontWallGroup" position="0 0 2">
+    <a-plane rotation="0 0 0" width="14" height="4.2" position="0 2.1 0" color="#241f18"></a-plane>
+    <a-entity id="door" position="0 1.55 -0.05" rotation="0 0 0">
+      <a-box width="1.6" height="3.1" depth="0.12" position="0 0 0"
+             material="src:#doorTex; color:#8a6a45"></a-box>
+      <a-text value="ENTRANCE" align="center" position="0 1.75 0.1" color="#d8b96a" width="4"></a-text>
+    </a-entity>
+  </a-entity>
+
+  <!-- ============ MARINE FRESHWATER WETLAND WING (left wall, z from -4 to -31) ============ -->
+  <a-entity id="Marine-freshwater-wetlandWing">
+    <a-text value="Marine, Freshwater, & Wetland Habitats" align="center" position="-6.85 3.1 -2" rotation="0 90 0" color="#d8b96a" width="6"></a-text>
+
+    <a-image src="#hist1"  position="-6.9 1.9 -3"  rotation="0 90 0" width="2.1" height="1.55" class="artwork" data-title="1. TBlacktip Reef Shark. (Carcharhinus melanopterus)" data-desc="This marine apex predator regulates populations of reef fishes. It also removes weak and sick prey. It also maintains a balanced marine food web. Unfortunately, this marine species is listed as Vulnerable under IUCN Red List of Threatened Species (2020). One of the major threats is fishing. To avoid this, the government should create an assigned marine protected area (MPAs)."></a-image>
+    <a-image src="#hist2"  position="-6.9 1.9 -6"  rotation="0 90 0" width="2.1" height="1.55" class="artwork" data-title="2. Giant Clam (Tridacna gigas)" data-desc="These marine species serve as a filter feeder which helps filter and improves the seawater quality. It also supports healthy coral reefs. And more importantly serves as a shelter for reef organisms. These are listed as critically endangered in the IUCN Red List of Threatened Species (2024). One of the major threats to this species include harvesting which can be prevented by implementing marine protected areas (MPAs)."></a-image>
+    <a-image src="#hist3"  position="-6.9 1.9 -9"  rotation="0 90 0" width="2.1" height="1.55" class="artwork" data-title="3. Green Sea Turtle (Chelonia mydas)" data-desc="The green sea turtle (chelonia mydas) is a large marine turtle found in tropical and subtropical coastal waters, especially seagrass beds and coral reefs, where it acts as a grazing herbivore and major threats include hunting, bycatch, habitat loss, and nesting beach disturbance. Conservation should focus on protecting nesting beaches, reducing fishing gear entanglement and safeguarding seagrass habitats."></a-image>
+    <a-image src="#hist4"  position="-6.9 1.9 -12" rotation="0 90 0" width="2.1" height="1.55" class="artwork" data-title="4. Philippine Duck (Anas luzonica)" data-desc="The philippine duck (anas luzonica) is an endemic wetland bird in the philippines that lives in marshes, lakes, rivers, mangroves and coastal wetlands, where it helps cycle nutrients as it feeds on plants, insects, shrimp and small fish. It is listed as vulnerable by the IUCN because of hunting, trapping and wetland loss. Protecting and restoring wetlands, enforcing hunting bans, and reducing pesticide use are the main conservation priorities."></a-image>
+    <a-image src="#hist5"  position="-6.9 1.9 -15" rotation="0 90 0" width="2.1" height="1.55" class="artwork" data-title="5. Philippine Crocodile (Crocodylus mindorensis)" data-desc="The Philippine crocodile (Crocodylus mindorensis) is a critically endangered freshwater crocodile found in rivers, ponds, and marshes in the Philippines, especially on a few fragmented islands. It is a top predator that helps keep freshwater ecosystems balanced by eating fish, invertebrates, small mammals, reptiles, and birds. Its main threats are hunting, habitat destruction, and human disturbance, so conservation should focus on protecting wetlands, enforcing wildlife laws, and supporting breeding and release programs."></a-image>
+  </a-entity>
+
+  <!-- ============ MANGROVE FOREST FRESHWATER WETLAND WING (right wall, z from -4 to -31) ============ -->
+  <a-entity id="Mangrove, Forest, Freshwater, & Wetland HabitatsWing">
+    <a-text value="Mangrove, Forest, Freshwater, & Wetland Habitats" align="center" position="6.85 3.1 -2" rotation="0 -90 0" color="#d8b96a" width="6"></a-text>
+
+    <a-image src="#sp1"  position="6.9 1.9 -3"  rotation="0 -90 0" width="2.1" height="1.55" class="artwork" data-title="6. Mud Crab (Scylla serrata)" data-desc="Thriving under mangrove ecosystems, this species recycles nutrients by scavenging. It controls populations of smaller animals. Lastly, it helps maintain the mangrove food web.  While there is no information about its conservation status, fishery agencies and researchers recognize this species as vulnerable to overfishing and habitat degradation. Because of this, one recommended conservation include sustainable fisheries to prevent overfishing and maintain biodiversity."></a-image>
+    <a-image src="#sp2"  position="6.9 1.9 -6"  rotation="0 -90 0" width="2.1" height="1.55" class="artwork" data-title="7. Giant Golden-crowned Flying Fox (Acerodon jubatus)" data-desc="Most commonly found in tropical forests, this species role as a seed disperser, obviously, disperses seeds over long distances. It also helps regenerate the tropical forests. As well as,  supports plant diversity and forest health. According to the IUCN Red List of Threatened Species (2016), they are listed as Endangered. These species are most vulnerable to hunting and habitat loss. Protecting roosts is one way of conservation."></a-image>
+    <a-image src="#sp3"  position="6.9 1.9 -9"  rotation="0 -90 0" width="2.1" height="1.55" class="artwork" data-title="8. Visayan warty pig (Sus cebifrons)" data-desc="The Visayan Warty Pig (Sus cebifrons) is a Critically Endangered species found only on the Philippine islands of Negros and Panay, where it lives in tropical forests. It serves as both an ecosystem engineer and seed disperser by digging the soil, recycling nutrients, and spreading seeds that help forests regenerate, making it a keystone species. Its main threats are habitat loss, illegal hunting, agricultural expansion, and hybridization with domestic pigs. Conservation efforts include protecting forests, enforcing wildlife laws, supporting captive breeding programs, and educating local communities."></a-image>
+    <a-image src="#sp4"  position="6.9 1.9 -12" rotation="0 -90 0" width="2.1" height="1.55" class="artwork" data-title="9. Philippine Eagle (monkey-eating eagle)" data-desc="The Philippine Eagle, also known as the monkey-eating eagle, has the scientific name “Pithecophaga jefferyi”. It inhabits primary and secondary dipterocarp forests in the Philippines, nesting in tall trees at elevations between 150 1450 meters. As an apex predator, it preys on monkeys, flying lemurs, and other small mammals, helping regulate populations and maintain ecological balance. It is considered a keystone species because its decline would destabilize forest ecosystems, leading to overpopulation of prey species and reduced biodiversity. Its conservation status is Critically Endangered (IUCN Red List, DENR), with fewer than 500 mature individuals remaining in the wild. Major threats include deforestation, hunting, trapping, environmental degradation from mining, and bioaccumulation of pesticides. Conservation recommendations include strict enforcement of anti-poaching laws, expansion of protected forest reserves, community-based conservation programs, captive breeding and release initiatives, and increased public awareness campaigns to highlight its ecological importance and cultural significance as the “Haribon” or “King Bird” of the Philippines."></a-image>
+    <a-image src="#sp5"  position="6.9 1.9 -15" rotation="0 -90 0" width="2.1" height="1.55" class="artwork" data-title="10. Water Buffalo (Carabao) (Bubalus bubalis)" data-desc="The water buffalo or carabao (Bubalus bubalis) is a domestic livestock animal in the Philippines, commonly used for farming and draft work in rice fields. It is a nutrient cycler and ecosystem helper because it supports agriculture, but it is not usually considered a keystone wild species. Its main value is in rural farming, while its conservation focuses on preserving local breeds and sustainable use rather than wildlife protection."></a-image>
+  </a-entity>
+
+  <!-- Frame trim (simple gold borders behind each picture row) -->
+  <a-entity id="trimLeft">
+    <a-plane rotation="0 90 0" width="2.3" height="1.75" position="-6.95 1.9 -3"  color="#d8b96a"></a-plane>
+    <a-plane rotation="0 90 0" width="2.3" height="1.75" position="-6.95 1.9 -6"  color="#d8b96a"></a-plane>
+    <a-plane rotation="0 90 0" width="2.3" height="1.75" position="-6.95 1.9 -9"  color="#d8b96a"></a-plane>
+    <a-plane rotation="0 90 0" width="2.3" height="1.75" position="-6.95 1.9 -12" color="#d8b96a"></a-plane>
+    <a-plane rotation="0 90 0" width="2.3" height="1.75" position="-6.95 1.9 -15" color="#d8b96a"></a-plane>
+  </a-entity>
+  <a-entity id="trimRight">
+    <a-plane rotation="0 -90 0" width="2.3" height="1.75" position="6.95 1.9 -3"  color="#d8b96a"></a-plane>
+    <a-plane rotation="0 -90 0" width="2.3" height="1.75" position="6.95 1.9 -6"  color="#d8b96a"></a-plane>
+    <a-plane rotation="0 -90 0" width="2.3" height="1.75" position="6.95 1.9 -9"  color="#d8b96a"></a-plane>
+    <a-plane rotation="0 -90 0" width="2.3" height="1.75" position="6.95 1.9 -12" color="#d8b96a"></a-plane>
+    <a-plane rotation="0 -90 0" width="2.3" height="1.75" position="6.95 1.9 -15" color="#d8b96a"></a-plane>
+  </a-entity>
+
+  <!-- End wall -->
+  <a-text value="THANK YOU FOR VISITING" align="center" position="0 2.2 -37.8" color="#d8b96a" width="6"></a-text>
+
+  <!-- ============ CAMERA / PLAYER (360° look + walk) ============ -->
+  <a-entity id="rig" position="0 1.6 6" movement-controls="speed:0.12">
+    <a-camera id="cam" look-controls wasd-controls="acceleration:40" fov="80">
+      <a-cursor color="#d8b96a"></a-cursor>
+    </a-camera>
+  </a-entity>
+
+</a-scene>
+
+<script>
+  // ---------- Door open + entry sequence ----------
+  const intro = document.getElementById('intro');
+  const enterBtn = document.getElementById('enterBtn');
+  const hint = document.getElementById('hint');
+  const door = document.getElementById('door');
+  const rig = document.getElementById('rig');
+
+  const finishTourBtn = document.getElementById('finishTourBtn');
+  const thankYou = document.getElementById('thankYou');
+  const moveControls = document.getElementById('moveControls');
+
+  enterBtn.addEventListener('click', () => {
+    // Swing the door open
+    door.setAttribute('animation', {
+      property: 'rotation',
+      to: '0 100 0',
+      dur: 1200,
+      easing: 'easeInOutQuad'
+    });
+
+    setTimeout(() => {
+      intro.style.opacity = 0;
+      setTimeout(() => { intro.style.display = 'none'; }, 1100);
+      hint.style.opacity = 1;
+      setTimeout(() => { hint.style.opacity = 0; }, 6000);
+      finishTourBtn.classList.add('visible');
+      moveControls.classList.add('visible');
+
+      // Walk the visitor forward through the doorway into the hall
+      rig.setAttribute('animation', {
+        property: 'position',
+        to: '0 1.6 -1',
+        dur: 2200,
+        easing: 'easeInOutQuad'
+      });
+    }, 500);
+  });
+
+  // ---------- Finish tour ----------
+  finishTourBtn.addEventListener('click', () => {
+    thankYou.classList.add('show');
+    finishTourBtn.classList.remove('visible');
+    moveControls.classList.remove('visible');
+    Object.keys(moveState).forEach(k => moveState[k] = false);
+    hint.style.opacity = 0;
+    caption.style.opacity = 0;
+    // Freeze the visitor's movement/look controls
+    const camEl2 = document.getElementById('cam');
+    camEl2.setAttribute('look-controls', 'enabled', false);
+    camEl2.setAttribute('wasd-controls', 'enabled', false);
+  });
+
+  // ---------- Caption on proximity to each artwork ----------
+  const caption = document.getElementById('caption');
+  const artworks = Array.from(document.querySelectorAll('.artwork'));
+
+  function tick() {
+    const camPos = new THREE.Vector3();
+    const camEl = document.getElementById('cam');
+    if (camEl && camEl.object3D) {
+      camEl.object3D.getWorldPosition(camPos);
+      let nearest = null, nearestDist = 4.2; // proximity threshold
+      artworks.forEach(a => {
+        const p = new THREE.Vector3();
+        a.object3D.getWorldPosition(p);
+        const d = camPos.distanceTo(p);
+        if (d < nearestDist) { nearestDist = d; nearest = a; }
+      });
+      if (nearest) {
+        caption.textContent = nearest.getAttribute('data-title');
+        caption.style.opacity = 1;
+      } else {
+        caption.style.opacity = 0;
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // ---------- Click-to-zoom modal ----------
+  const modalOverlay = document.getElementById('modalOverlay');
+  const modalImg = document.getElementById('modalImg');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalDesc = document.getElementById('modalDesc');
+  const modalClose = document.getElementById('modalClose');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const camEl = document.getElementById('cam');
+
+  let currentIndex = -1;
+
+  function setControlsEnabled(enabled) {
+    camEl.setAttribute('look-controls', 'enabled', enabled);
+    camEl.setAttribute('wasd-controls', 'enabled', enabled);
+  }
+
+  function getImageSrc(aImageEl) {
+    // Resolve the #assetId reference back to the actual image URL
+    const ref = aImageEl.getAttribute('src');
+    if (ref && ref.startsWith('#')) {
+      const assetEl = document.querySelector(ref);
+      return assetEl ? assetEl.src : '';
+    }
+    return ref;
+  }
+
+  function openModal(index) {
+    currentIndex = index;
+    const el = artworks[currentIndex];
+    modalImg.src = getImageSrc(el);
+    modalTitle.textContent = el.getAttribute('data-title');
+    modalDesc.textContent = el.getAttribute('data-desc');
+    prevBtn.disabled = currentIndex === 0;
+    nextBtn.disabled = currentIndex === artworks.length - 1;
+    modalOverlay.classList.add('show');
+    setControlsEnabled(false);
+    caption.style.opacity = 0;
+  }
+
+  function closeModal() {
+    modalOverlay.classList.remove('show');
+    setControlsEnabled(true);
+  }
+
+  artworks.forEach((el, idx) => {
+    el.addEventListener('click', () => openModal(idx));
+  });
+
+  modalClose.addEventListener('click', closeModal);
+  modalOverlay.addEventListener('click', (e) => {
+    if (e.target === modalOverlay) closeModal();
+  });
+
+  prevBtn.addEventListener('click', () => {
+    if (currentIndex > 0) openModal(currentIndex - 1);
+  });
+  nextBtn.addEventListener('click', () => {
+    if (currentIndex < artworks.length - 1) openModal(currentIndex + 1);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (!modalOverlay.classList.contains('show')) return;
+    if (e.key === 'Escape') closeModal();
+    if (e.key === 'ArrowRight' && !nextBtn.disabled) openModal(currentIndex + 1);
+    if (e.key === 'ArrowLeft' && !prevBtn.disabled) openModal(currentIndex - 1);
+  });
+
+  // ---------- Forward / Backward / Left / Right movement (buttons + keys) ----------
+  const btnForward = document.getElementById('btnForward');
+  const btnBack = document.getElementById('btnBack');
+  const btnLeft = document.getElementById('btnLeft');
+  const btnRight = document.getElementById('btnRight');
+
+  const moveState = { forward: false, backward: false, left: false, right: false };
+  const MOVE_SPEED = 2.2; // meters per second
+
+  function bindHoldButton(btnEl, key) {
+    const press = (e) => { e.preventDefault(); moveState[key] = true; btnEl.classList.add('pressed'); };
+    const release = (e) => { if (e) e.preventDefault(); moveState[key] = false; btnEl.classList.remove('pressed'); };
+    btnEl.addEventListener('pointerdown', press);
+    btnEl.addEventListener('pointerup', release);
+    btnEl.addEventListener('pointerleave', release);
+    btnEl.addEventListener('pointercancel', release);
+  }
+  bindHoldButton(btnForward, 'forward');
+  bindHoldButton(btnBack, 'backward');
+  bindHoldButton(btnLeft, 'left');
+  bindHoldButton(btnRight, 'right');
+
+  // Safety net: if the pointer is released or lost anywhere outside the button
+  // (finger slides off before lifting, window loses focus, etc.), make sure
+  // movement doesn't stay stuck "on".
+  function releaseAllMoveButtons() {
+    Object.keys(moveState).forEach(k => moveState[k] = false);
+    [btnForward, btnBack, btnLeft, btnRight].forEach(b => b.classList.remove('pressed'));
+  }
+  window.addEventListener('pointerup', releaseAllMoveButtons);
+  window.addEventListener('pointercancel', releaseAllMoveButtons);
+  window.addEventListener('blur', releaseAllMoveButtons);
+
+  // Arrow keys also move forward/back/left/right when the zoom modal is closed
+  window.addEventListener('keydown', (e) => {
+    if (modalOverlay.classList.contains('show')) return;
+    if (e.key === 'ArrowUp') moveState.forward = true;
+    if (e.key === 'ArrowDown') moveState.backward = true;
+    if (e.key === 'ArrowLeft') moveState.left = true;
+    if (e.key === 'ArrowRight') moveState.right = true;
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowUp') moveState.forward = false;
+    if (e.key === 'ArrowDown') moveState.backward = false;
+    if (e.key === 'ArrowLeft') moveState.left = false;
+    if (e.key === 'ArrowRight') moveState.right = false;
+  });
+
+  // Walking-bob: a subtle up/down sway on the camera while moving, so forward/backward
+  // motion visually feels like footsteps rather than a flat glide.
+  const bobCamera = document.getElementById('cam');
+  let bobTime = 0;
+  let lastFrameTime = performance.now();
+
+  function movementLoop(now) {
+    const dt = Math.min((now - lastFrameTime) / 1000, 0.1); // seconds, clamped
+    lastFrameTime = now;
+
+    const isMoving = moveState.forward || moveState.backward || moveState.left || moveState.right;
+    const controlsFrozen = modalOverlay.classList.contains('show') || thankYou.classList.contains('show');
+
+    if (isMoving && !controlsFrozen && rig.object3D && camEl.object3D) {
+      // Direction the camera is currently facing, flattened to the ground plane
+      const forwardDir = new THREE.Vector3();
+      camEl.object3D.getWorldDirection(forwardDir);
+      forwardDir.y = 0;
+      forwardDir.normalize();
+
+      // Camera's true world-space "right" axis, read directly from its world matrix
+      // (more reliable than a manual cross product, which was previously flipped)
+      const rightDir = new THREE.Vector3();
+      rightDir.setFromMatrixColumn(camEl.object3D.matrixWorld, 0);
+      rightDir.y = 0;
+      rightDir.normalize();
+
+      const move = new THREE.Vector3();
+      if (moveState.forward)  move.sub(forwardDir);
+      if (moveState.backward) move.add(forwardDir);
+      if (moveState.right)    move.add(rightDir);
+      if (moveState.left)     move.sub(rightDir);
+
+      if (move.lengthSq() > 0) {
+        move.normalize().multiplyScalar(MOVE_SPEED * dt);
+        rig.object3D.position.x += move.x;
+        rig.object3D.position.z += move.z;
+      }
+
+      // Footstep bob
+      bobTime += dt * 8;
+      bobCamera.object3D.position.y = Math.sin(bobTime) * 0.035;
+    } else {
+      // Ease the bob back to a neutral standing height
+      bobCamera.object3D.position.y *= 0.85;
+      if (Math.abs(bobCamera.object3D.position.y) < 0.001) bobCamera.object3D.position.y = 0;
+    }
+
+    requestAnimationFrame(movementLoop);
+  }
+  requestAnimationFrame(movementLoop);
+</script>
+
+</body>
+</html>
